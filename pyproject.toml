@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stocker"
+version = "0.1.0"
+authors = [
+    { name = "Retrontology" }
+]
+description = "A library for tracking product stock and prices across various retailers"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "requests",
+    "beautifulsoup4"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/retrontology/stocker"
+"Bug Tracker" = "https://github.com/retrontology/stocker/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
