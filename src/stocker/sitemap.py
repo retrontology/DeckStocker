@@ -125,7 +125,7 @@ class SitemapCrawler():
         raise Exception("No products sitemap found")
     
 
-    def get_products(self) -> Generator[ProductURL, None, None]:
+    def get_product_urls(self) -> Generator[ProductURL, None, None]:
         """
         Fetches and parses the products sitemap.
         Returns:

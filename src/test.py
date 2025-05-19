@@ -1,11 +1,15 @@
 from stocker.providers.baker import Baker
+from stocker.providers.nocomply import NoComply
+from stocker.product import ItemAvailability
 
 
 baker = Baker()
+nocomply = NoComply()
 
 
-products = baker.get_products()
+products = nocomply.get_products()
 
 for product in products:
-    if not product.in_stock:
-        print(product)
+    for offer in product.offers:
+        if offer.availability != ItemAvailability.IN_STOCK:
+            print(f'{product.name} - {offer.name} - {offer.availability}')

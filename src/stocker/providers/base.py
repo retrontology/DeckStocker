@@ -1,5 +1,6 @@
 from stocker.sitemap import SitemapCrawler, ProductURL
 from typing import Generator, List
+import json
 import logging
 import requests
 from bs4 import BeautifulSoup
@@ -12,12 +13,12 @@ class BaseProvider:
     Attributes:
         sitemap_url (str): The URL of the root sitemap.
         sitemap_crawler (SitemapCrawler): The sitemap crawler class.
+        name (str): The name of the provider.
     """
-
 
     sitemap_url: str
     sitemap_crawler: SitemapCrawler = SitemapCrawler
-
+    name: str
 
     def __init__(self) -> None:
         """
@@ -25,90 +26,35 @@ class BaseProvider:
         """
         self.logger = logging.getLogger(f'{self.__class__.__name__}')
         self.sitemap = self.sitemap_crawler(self.sitemap_url)
+        self.name = self.__class__.__name__
 
 
-    def get_products(self) -> Generator[ProductURL, None, None]:
+    def _get_page(self, url: str) -> BeautifulSoup:
         """
-        Retrieves all product URLs from the sitemap.
-
-        Returns:
-            Generator[ProductURL, None, None]: A generator of product URLs.
+        Retrieves a page from the provider and returns a BeautifulSoup object.
         """
-        product_urls = self.sitemap.get_products()
-        for product_url in product_urls:
-            yield self.get_product(product_url)
-
-
-    def get_product(self, product_url: ProductURL) -> List[Product]:
-        """
-        Retrieves a product page from the provider and parses it to get the product information.
-
-        Args:
-            product_url (ProductURL): The product URL.
-
-        Returns:
-            List[Product]: A list of products, one for each variant.
-        """
-        response = requests.get(product_url.url)
+        response = requests.get(url)
         if response.status_code != 200:
             raise Exception(f"Failed to get product page: {response.status_code}")
+        return BeautifulSoup(response.text, 'html.parser')
 
-        soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Get all variants for this product
-        variants = self.parse_variants(soup)
+    def _get_product_json(self, url: str) -> dict:
+        """
+        Retrieves the product JSON data from a product page.
+        """
+        soup = self._get_page(url)
+        product_json = soup.find('script', type='application/ld+json')
+        if not product_json:
+            raise Exception("No product JSON found")
+        return json.loads(product_json.text)
         
-        if not variants:
-            # If no variants found, treat as single product
-            in_stock = self.parse_stock_status(soup)
-            price = self.parse_price(soup)
-            return [Product.from_product_url(product_url, in_stock, price)]
-        
-        products = []
-        for variant in variants:
-            in_stock = self.parse_stock_status(soup, variant)
-            price = self.parse_price(soup, variant)
-            products.append(Product.from_product_url(product_url, in_stock, price, variant))
-        
-        return products
 
-
-    def parse_variants(self, soup: BeautifulSoup) -> List[str]:
+    def get_products(self) -> Generator[Product]:
         """
-        Parses the variants from the product page. Should be implemented by child classes.
-
-        Args:
-            soup (BeautifulSoup): The BeautifulSoup object of the product page.
-
-        Returns:
-            List[str]: A list of variant identifiers.
+        Retrieves all products from the provider and returns a generator of Products.
         """
-        pass
-
-
-    def parse_stock_status(self, soup: BeautifulSoup, variant: str = None) -> bool:
-        """
-        Parses the stock status from the product page. Should be implemented by child classes.
-
-        Args:
-            soup (BeautifulSoup): The BeautifulSoup object of the product page.
-            variant (str, optional): The variant identifier. Defaults to None.
-
-        Returns:
-            bool: Whether the product is in stock.
-        """
-        pass
-
-
-    def parse_price(self, soup: BeautifulSoup, variant: str = None) -> float:
-        """
-        Parses the price from the product page. Should be implemented by child classes.
-
-        Args:
-            soup (BeautifulSoup): The BeautifulSoup object of the product page.
-            variant (str, optional): The variant identifier. Defaults to None.
-
-        Returns:
-            float: The price of the product.
-        """
-        pass
+        for product_url in self.sitemap.get_product_urls():
+            product_json = self._get_product_json(product_url.url)
+            yield Product.from_json(product_json)
+    
